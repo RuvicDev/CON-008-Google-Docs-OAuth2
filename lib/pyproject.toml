@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ruvic-docs-connector"
+version = "1.0.0"
+description = "Conector Ruvic para Google Docs (cuenta personal o Google Workspace) vía OAuth2 con refresh token"
+requires-python = ">=3.10"
+dependencies = [
+    "google-auth>=2.29,<3.0",
+    "google-api-python-client>=2.130,<3.0",
+]
+
+[tool.setuptools.packages.find]
+include = ["ruvic_docs_connector*"]

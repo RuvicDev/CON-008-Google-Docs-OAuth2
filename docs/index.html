@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Conector Google Docs — Ruvic</title>
+  <link rel="stylesheet" href="assets/ruvic.css">
+</head>
+<body class="guide">
+  <main class="ruvic-container">
+
+    <nav class="ruvic-toc" aria-label="Índice">
+      <h2>Contenido</h2>
+      <ol>
+        <li><a href="#que-es">¿Qué es y para qué sirve?</a></li>
+        <li><a href="#prerrequisitos">Prerrequisitos</a></li>
+        <li><a href="#configuracion-fabricante">Configuración en el fabricante</a></li>
+        <li><a href="#permisos">Permisos requeridos</a></li>
+        <li><a href="#configuracion-ruvic">Configuración en Ruvic</a></li>
+        <li><a href="#verificacion">Verificación</a></li>
+        <li><a href="#solucion-problemas">Solución de problemas</a></li>
+        <li><a href="#faq-seguridad">Preguntas frecuentes y notas de seguridad</a></li>
+      </ol>
+    </nav>
+
+    <h1>Google Docs</h1>
+    <p class="guide-updated">{{ULTIMA_ACTUALIZACION}}</p>
+
+    <!-- ============ 1. QUÉ ES ============ -->
+    <section>
+      <h2 id="que-es">¿Qué es y para qué sirve?</h2>
+
+      <p>El conector Google Docs permite que el agente de Ruvic lea, cree y edite documentos directamente. Una vez configurado, puedes pedirle al agente cosas como:</p>
+      <ul>
+        <li>"Lee el acta de la última reunión y resúmela."</li>
+        <li>"Crea un documento nuevo con el borrador de esta propuesta."</li>
+        <li>"Llena la plantilla del contrato reemplazando {{CLIENTE}} por ACME S.A."</li>
+      </ul>
+      <p>Operaciones soportadas:</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Operación</th>
+            <th>Qué hace</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>docs.read</code></td>
+            <td>Lee el título y el texto completo de un documento</td>
+          </tr>
+          <tr>
+            <td><code>docs.create</code></td>
+            <td>Crea un documento nuevo (con texto inicial opcional)</td>
+          </tr>
+          <tr>
+            <td><code>docs.append</code></td>
+            <td>Agrega texto al final de un documento</td>
+          </tr>
+          <tr>
+            <td><code>docs.replace</code></td>
+            <td>Busca y reemplaza texto en todo el documento (ideal para plantillas)</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="callout callout-info">
+        <span class="callout-title">Solo documentos compartidos con la cuenta autorizada</span>
+        El conector actúa como la cuenta de Google que autorizó el acceso (paso único durante la configuración). Solo puede leer/editar documentos de los que esa cuenta sea dueña o con los que se haya compartido explícitamente.
+      </div>
+    </section>
+
+    <!-- ============ 2. PRERREQUISITOS ============ -->
+    <section>
+      <h2 id="prerrequisitos">Prerrequisitos</h2>
+
+      <ul>
+        <li>Una cuenta de <strong>Google</strong> (personal @gmail.com o de <strong>Google Workspace</strong>) con acceso a los documentos que el agente debe leer/editar.</li>
+        <li>Si usas el modo "Autorizar con Google" (recomendado): nada más, la plataforma ya tiene su propia app OAuth configurada.</li>
+        <li>Si usas "Usar credenciales propias" o pruebas locales: acceso al <strong>Google Cloud Console</strong> (o reutilizar el proyecto de otro conector de Google ya configurado, ej. Gmail o Sheets).</li>
+      </ul>
+    </section>
+
+    <!-- ============ 3. CONFIGURACIÓN EN EL FABRICANTE ============ -->
+    <section>
+      <h2 id="configuracion-fabricante">Configuración en el fabricante</h2>
+
+      <p>Si usas el modo <strong>"Autorizar con Google"</strong> (recomendado), sáltate esta sección — la plataforma ya tiene una app OAuth propia, solo necesitas iniciar sesión y aceptar los permisos. Esta sección aplica si eliges "Usar credenciales propias" o quieres probar el conector localmente con <code>get_refresh_token.py</code>.</p>
+
+      <ol class="ruvic-steps">
+        <li>
+          <strong>Crea (o reutiliza) un proyecto en Google Cloud Console.</strong>
+          <p>Ve a <a href="https://console.cloud.google.com/projectcreate" target="_blank" rel="noopener">console.cloud.google.com/projectcreate</a>, o usa el mismo proyecto de otro conector de Google ya configurado.</p>
+        </li>
+
+        <li>
+          <strong>Habilita la Google Docs API.</strong>
+          <p>En el menú <em>APIs y servicios → Biblioteca</em>, busca "Google Docs API" y pulsa <em>Habilitar</em>.</p>
+        </li>
+
+        <li>
+          <strong>Configura la pantalla de consentimiento OAuth (si no existe ya).</strong>
+          <p>En <em>APIs y servicios → Pantalla de consentimiento de OAuth</em>: tipo de usuario <strong>Externo</strong>, y en <strong>Público → Usuarios de prueba</strong> agrega el correo de la cuenta a conectar. Si ya la configuraste para otro conector de Google, sáltate este paso.</p>
+        </li>
+
+        <li>
+          <strong>Crea (o reutiliza) el cliente OAuth.</strong>
+          <p>En <em>APIs y servicios → Credenciales → Crear credenciales → ID de cliente de OAuth</em>:</p>
+          <ul>
+            <li>Para "Usar credenciales propias" en Ruvic: tipo <strong>Aplicación web</strong>, con URI de redirección <code>{WEB_URL}/api/v1/connectors/oauth/callback</code>.</li>
+            <li>Para pruebas locales con <code>get_refresh_token.py</code>: tipo <strong>Aplicación de escritorio</strong>.</li>
+          </ul>
+          <p>Anota el <strong>Client ID</strong> y el <strong>Client Secret</strong> generados.</p>
+        </li>
+
+        <li>
+          <strong>(Solo pruebas locales) Obtén el refresh token con el script incluido.</strong>
+          <p>Desde el paquete del conector, en tu computadora:</p>
+<pre><code>pip install google-auth-oauthlib
+python get_refresh_token.py --client-id TU_CLIENT_ID --client-secret TU_CLIENT_SECRET</code></pre>
+          <p>Se abre el navegador: inicia sesión con la cuenta que tiene (o tendrá) acceso a los documentos a usar, y acepta los permisos. El script imprime <code>client_id</code>, <code>client_secret</code> y <code>refresh_token</code> — copia los tres.</p>
+        </li>
+
+        <li>
+          <strong>Comparte los documentos con esa cuenta (si no son de su propiedad).</strong>
+          <p>Si el documento pertenece a otro usuario, ábrelo → <em>Compartir</em> → agrega el correo de la cuenta autorizada con permiso de <strong>Editor</strong> (necesario para <code>docs.append</code> y <code>docs.replace</code>).</p>
+          <div class="screenshot-placeholder">
+            [ Captura: diálogo de "Compartir" de Google Docs con el correo de la cuenta agregado como Editor — reemplazar por assets/img/docs-share.png ]
+          </div>
+        </li>
+      </ol>
+    </section>
+
+    <!-- ============ 4. PERMISOS ============ -->
+    <section>
+      <h2 id="permisos">Permisos requeridos</h2>
+
+      <p>Principio de mínimo privilegio: el conector solo necesita este scope de Docs. No agregues scopes de Drive completo ni de otras APIs de Workspace.</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Scope</th>
+            <th>Para qué lo usa el conector</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>documents</code></td>
+            <td>Leer (<code>docs.read</code>), crear (<code>docs.create</code>) y editar (<code>docs.append</code>, <code>docs.replace</code>) documentos accesibles por la cuenta</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>El conector <strong>no</strong> solicita el scope completo de Drive: no puede mover, eliminar ni cambiar permisos de archivos, ni acceder a archivos que no sean documentos de Google Docs.</p>
+    </section>
+
+    <!-- ============ 5. CONFIGURACIÓN EN RUVIC ============ -->
+    <section>
+      <h2 id="configuracion-ruvic">Configuración en Ruvic</h2>
+
+      <p>Entra a <strong>Settings → Conectores</strong>, busca la tarjeta <strong>Google Docs</strong> y pulsa <strong>Configurar</strong>. Elige uno de los 3 modos:</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Modo</th>
+            <th>Cuándo usarlo</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Autorizar con Google <em>(recomendado)</em></td>
+            <td>El camino más simple: guarda y pulsa <strong>Autorizar</strong>, inicia sesión con tu cuenta de Google y acepta los permisos. No requiere Google Cloud Console.</td>
+          </tr>
+          <tr>
+            <td>Usar credenciales propias</td>
+            <td>Si tu equipo prefiere usar su propia app OAuth en vez de la de Ruvic. Pega el Client ID/Secret de la sección anterior y pulsa Autorizar.</td>
+          </tr>
+          <tr>
+            <td>Refresh token manual</td>
+            <td>Para migraciones o pruebas locales: pega directamente un <code>refresh_token</code> ya generado con <code>get_refresh_token.py</code>.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>Guarda y pulsa <span class="ruvic-button">Probar conexión</span> — la plataforma validará que el refresh token sea válido (no necesita un documento específico para esta prueba).</p>
+
+      <div class="screenshot-placeholder">
+        [ Captura: formulario del conector Google Docs en Settings → Conectores — reemplazar por assets/img/docs-form.png ]
+      </div>
+    </section>
+
+    <!-- ============ 6. VERIFICACIÓN ============ -->
+    <section>
+      <h2 id="verificacion">Verificación</h2>
+
+      <ol class="ruvic-steps">
+        <li>
+          <strong>Test de conexión exitoso.</strong>
+          <p>El botón <em>Probar conexión</em> debe responder: <em>"Conexión exitosa: credenciales OAuth de Docs válidas"</em>. La tarjeta del conector cambia a estado <strong>Configurado</strong>.</p>
+        </li>
+        <li>
+          <strong>Automatización mínima de prueba.</strong>
+          <p>Abre una conversación nueva con el agente y pídele:</p>
+          <blockquote><em>"Crea un documento de prueba que se llame 'Prueba Ruvic' con un párrafo de ejemplo, y pásame el link."</em></blockquote>
+          <p>El agente debe responder con la URL de un documento real, visible en tu Drive. Si lo hace, el conector quedó operativo de punta a punta.</p>
+        </li>
+      </ol>
+    </section>
+
+    <!-- ============ 7. SOLUCIÓN DE PROBLEMAS ============ -->
+    <section>
+      <h2 id="solucion-problemas">Solución de problemas</h2>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Mensaje / síntoma</th>
+            <th>Causa probable y solución</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>"No se pudo autenticar: el refresh token puede estar revocado, vencido…"</td>
+            <td>El refresh token fue revocado, o la app OAuth sigue en estado <em>Testing</em> y pasaron más de 7 días sin usarlo. Vuelve a autorizar el conector (o corre <code>get_refresh_token.py</code> de nuevo en pruebas locales).</td>
+          </tr>
+          <tr>
+            <td>"La Google Docs API no está habilitada en el proyecto de Google Cloud…"</td>
+            <td>Falta habilitar la Google Docs API en el proyecto (paso 2 de la sección anterior, solo aplica si usas credenciales propias). El mensaje del conector incluye el enlace directo de activación; habilítala y espera 1-2 minutos.</td>
+          </tr>
+          <tr>
+            <td>"El documento solicitado no existe, o la cuenta autenticada no tiene acceso"</td>
+            <td>El documento no fue compartido con la cuenta autorizada, o el <code>document_id</code> tiene un error de tipeo.</td>
+          </tr>
+          <tr>
+            <td>"Docs API no respondió correctamente (HTTP 429)"</td>
+            <td>Límite de cuota temporal de la API. Es transitorio; el agente puede reintentar en unos segundos.</td>
+          </tr>
+          <tr>
+            <td>El conector aparece "Sin configurar" tras guardar</td>
+            <td>Algún campo obligatorio quedó vacío, o no se completó el paso de Autorizar. Ábrelo de nuevo y completa el flujo.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ============ 8. FAQ Y SEGURIDAD ============ -->
+    <section>
+      <h2 id="faq-seguridad">Preguntas frecuentes y notas de seguridad</h2>
+
+      <h3>¿El agente puede leer o modificar cualquier documento de la cuenta?</h3>
+      <p>Sí, cualquier documento del que la cuenta autorizada sea dueña o que tenga compartido — el scope <code>documents</code> no distingue entre documentos específicos. Para limitar el alcance, usa una cuenta de Google dedicada que solo tenga acceso a los documentos que el agente debe usar.</p>
+
+      <h3>¿El agente puede eliminar documentos o cambiar permisos?</h3>
+      <p>No. El conector solo lee, crea y edita el contenido de documentos (<code>docs.read</code>, <code>docs.create</code>, <code>docs.append</code>, <code>docs.replace</code>). No elimina archivos, no cambia permisos de acceso ni toca otros archivos de Drive.</p>
+
+      <h3>¿Dónde queda guardado el refresh token?</h3>
+      <p>Como secreto en el almacén de credenciales de la plataforma, asociado a tu usuario, igual que el client_secret. La interfaz nunca vuelve a mostrarlos; solo indica "definido".</p>
+
+      <h3>¿Expira el refresh token?</h3>
+      <p>No, mientras la app OAuth esté <strong>publicada</strong> y el usuario no revoque el acceso manualmente. En estado <em>Testing</em>, Google lo expira a los 7 días sin uso — no aplica al modo "Autorizar con Google" (usa la app publicada de la plataforma).</p>
+
+      <h3>¿Qué hago si el refresh token se compromete?</h3>
+      <ol>
+        <li>El dueño de la cuenta entra a <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">myaccount.google.com/permissions</a> y revoca el acceso de la app conectada.</li>
+        <li>Vuelve a autorizar el conector en Settings → Conectores (o corre <code>get_refresh_token.py</code> de nuevo en pruebas locales).</li>
+        <li>Actualízalo en el formulario del conector.</li>
+      </ol>
+
+      <div class="callout callout-warning">
+        <span class="callout-title">Buenas prácticas</span>
+        Usa una cuenta de Google dedicada (no tu cuenta personal principal) para limitar qué documentos quedan expuestos al agente; comparte explícitamente solo los documentos necesarios; nunca compartas el client_secret ni el refresh_token por canales no seguros; y revisa periódicamente en <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">myaccount.google.com/permissions</a> qué apps tienen acceso concedido.
+      </div>
+    </section>
+
+  </main>
+</body>
+</html>

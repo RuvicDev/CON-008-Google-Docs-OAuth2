@@ -1,0 +1,148 @@
+{
+  "id": "docs",
+  "name": "Google Docs",
+  "name_en": "Google Docs",
+  "version": "1.0.0",
+  "description": "Lectura, creación y edición de documentos de Google Docs (cuenta personal o Google Workspace) mediante OAuth2 con refresh token",
+  "description_en": "Read, create and edit Google Docs documents (personal account or Google Workspace) using OAuth2 with a refresh token",
+  "icon": "icon.svg",
+  "category": "productivity",
+  "category_en": "productivity",
+  "keywords": ["docs", "google docs", "documento", "documentos", "document", "acta", "plantilla", "oauth", "google", "workspace"],
+  "library": {
+    "package": "ruvic-docs-connector",
+    "install": "pip install git+https://github.com/Dgirto/Docs.git#subdirectory=lib",
+    "import_name": "ruvic_docs_connector"
+  },
+  "auth_modes": [
+    {
+      "id": "oauth2_platform",
+      "label": "Autorizar con Google (recomendado)",
+      "fields": [
+        {
+          "key": "refresh_token",
+          "label": "Autorización de la cuenta",
+          "type": "oauth2_authorization",
+          "secret": true,
+          "required": true,
+          "oauth2": {
+            "authorization_url": "https://accounts.google.com/o/oauth2/v2/auth",
+            "token_url": "https://oauth2.googleapis.com/token",
+            "scopes": ["https://www.googleapis.com/auth/documents", "openid", "email"],
+            "extra_authorize_params": {
+              "access_type": "offline",
+              "prompt": "consent"
+            },
+            "pkce": true,
+            "capture": "refresh_token",
+            "identity_hint": "id_token.email",
+            "client_credentials": "platform",
+            "platform_provider": "google"
+          },
+          "help_text": "Guarda la instancia y pulsa Autorizar. Usa la app OAuth de Ruvic (RUVIC_OAUTH_GOOGLE_CLIENT_ID / RUVIC_OAUTH_GOOGLE_CLIENT_SECRET)."
+        },
+        {
+          "key": "request_timeout",
+          "label": "Timeout de solicitud (segundos)",
+          "type": "number",
+          "required": false,
+          "default": "30"
+        }
+      ]
+    },
+    {
+      "id": "oauth2",
+      "label": "Usar credenciales propias",
+      "fields": [
+        {
+          "key": "client_id",
+          "label": "Client ID de OAuth",
+          "type": "text",
+          "required": true,
+          "placeholder": "1234567890-abc123.apps.googleusercontent.com",
+          "help_text": "ID del cliente OAuth (tipo 'Aplicación web') creado en Google Cloud Console. Registra como URI de redirección: {WEB_URL}/api/v1/connectors/oauth/callback"
+        },
+        {
+          "key": "client_secret",
+          "label": "Client Secret de OAuth",
+          "type": "password",
+          "secret": true,
+          "required": true,
+          "help_text": "Secreto del mismo cliente OAuth"
+        },
+        {
+          "key": "refresh_token",
+          "label": "Autorización de la cuenta",
+          "type": "oauth2_authorization",
+          "secret": true,
+          "required": true,
+          "oauth2": {
+            "authorization_url": "https://accounts.google.com/o/oauth2/v2/auth",
+            "token_url": "https://oauth2.googleapis.com/token",
+            "scopes": ["https://www.googleapis.com/auth/documents", "openid", "email"],
+            "extra_authorize_params": {
+              "access_type": "offline",
+              "prompt": "consent"
+            },
+            "pkce": true,
+            "capture": "refresh_token",
+            "identity_hint": "id_token.email",
+            "client_credentials": "user"
+          },
+          "help_text": "Guarda la instancia con Client ID y Client Secret, luego pulsa Autorizar."
+        },
+        {
+          "key": "request_timeout",
+          "label": "Timeout de solicitud (segundos)",
+          "type": "number",
+          "required": false,
+          "default": "30"
+        }
+      ]
+    },
+    {
+      "id": "manual",
+      "label": "Refresh token manual",
+      "fields": [
+        {
+          "key": "client_id",
+          "label": "Client ID de OAuth",
+          "type": "text",
+          "required": true,
+          "placeholder": "1234567890-abc123.apps.googleusercontent.com",
+          "help_text": "ID del cliente OAuth creado en Google Cloud Console"
+        },
+        {
+          "key": "client_secret",
+          "label": "Client Secret de OAuth",
+          "type": "password",
+          "secret": true,
+          "required": true,
+          "help_text": "Secreto del mismo cliente OAuth"
+        },
+        {
+          "key": "refresh_token",
+          "label": "Refresh token",
+          "type": "password",
+          "secret": true,
+          "required": true,
+          "help_text": "Obtenido una sola vez con get_refresh_token.py o pegando un token existente"
+        },
+        {
+          "key": "request_timeout",
+          "label": "Timeout de solicitud (segundos)",
+          "type": "number",
+          "required": false,
+          "default": "30"
+        }
+      ]
+    }
+  ],
+  "env_prefix": "RUVIC_DOCS_",
+  "operations": ["docs.read", "docs.create", "docs.append", "docs.replace"],
+  "test_connection": true,
+  "docs": {
+    "skill": "SKILL.md",
+    "permissions_note": "OAuth2 con scope documents (lectura y edición de los documentos accesibles por la cuenta que autoriza; no accede a otros archivos de Drive). Modo recomendado: Autorizar con Google (app OAuth de Ruvic). Alternativas: credenciales propias o refresh token manual. Funciona con cuentas de Google personales y con Google Workspace."
+  }
+}
