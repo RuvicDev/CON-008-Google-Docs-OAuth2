@@ -28,7 +28,10 @@ import sys
 import tempfile
 from pathlib import Path
 
-SCOPES = ["https://www.googleapis.com/auth/documents"]
+SCOPES = [
+    "https://www.googleapis.com/auth/documents",
+    "https://www.googleapis.com/auth/drive",
+]
 
 
 def main() -> None:

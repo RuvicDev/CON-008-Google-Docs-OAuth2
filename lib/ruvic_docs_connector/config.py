@@ -13,6 +13,23 @@ from dataclasses import dataclass
 ENV_PREFIX = "RUVIC_DOCS_"
 
 
+def _read_timeout(default: int = 30) -> int:
+    """Lee REQUEST_TIMEOUT tratando el string vacío como ausente: la
+    plataforma envía "" cuando el campo opcional queda en blanco."""
+    raw = (os.environ.get(f"{ENV_PREFIX}REQUEST_TIMEOUT") or "").strip()
+    if not raw:
+        return default
+    try:
+        value = int(raw)
+    except ValueError:
+        raise ValueError(
+            f"{ENV_PREFIX}REQUEST_TIMEOUT debe ser un número entero de segundos, no {raw!r}."
+        ) from None
+    if value <= 0:
+        raise ValueError(f"{ENV_PREFIX}REQUEST_TIMEOUT debe ser mayor que 0, no {value}.")
+    return value
+
+
 @dataclass(frozen=True)
 class DocsConfig:
     """Parámetros de conexión a Google Docs vía OAuth2 (refresh token de usuario).
@@ -56,5 +73,5 @@ class DocsConfig:
             client_id=os.environ[f"{ENV_PREFIX}CLIENT_ID"],
             client_secret=os.environ[f"{ENV_PREFIX}CLIENT_SECRET"],
             refresh_token=os.environ[f"{ENV_PREFIX}REFRESH_TOKEN"],
-            request_timeout=int(os.environ.get(f"{ENV_PREFIX}REQUEST_TIMEOUT", "30")),
+            request_timeout=_read_timeout(),
         )

@@ -4,8 +4,10 @@ description: >
   Usa la librería ruvic_docs_connector para leer, crear y editar
   documentos de Google Docs - leer el título y texto completo de un
   documento (read_document), crear un documento nuevo (create_document),
-  agregar texto al final (append_text) y buscar/reemplazar texto en todo
-  el documento (replace_text). Úsala cuando el usuario pida leer,
+  agregar texto al final (append_text), buscar/reemplazar texto en todo
+  el documento (replace_text), crear un documento desde una plantilla
+  reemplazando sus variables (create_from_template) y exportar a PDF
+  (export_pdf). Úsala cuando el usuario pida leer,
   resumir, crear, redactar o actualizar un documento de Google Docs,
   llenar una plantilla con marcadores tipo {{CAMPO}}, o agregar
   contenido a un documento existente.
@@ -16,13 +18,15 @@ triggers:
 - docs
 - acta
 - plantilla
+- pdf
+- exportar a pdf
 - redactar documento
 - crear documento
 ---
 
 # Conector Google Docs (ruvic_docs_connector)
 
-Librería Python para leer, crear y editar documentos de Google Docs (cuenta personal o Google Workspace). Está **preinstalada en el runtime** cuando el conector está configurado (si no, instálala con `pip install git+https://github.com/Dgirto/Docs.git#subdirectory=lib`). Usa la API oficial de Docs con OAuth2 y un refresh token obtenido una única vez durante la configuración.
+Librería Python para leer, crear y editar documentos de Google Docs (cuenta personal o Google Workspace). Está **preinstalada en el runtime** cuando el conector está configurado (si no, instálala con `pip install git+https://github.com/Dgirto/Docs.git#subdirectory=lib`). Usa la API oficial de Docs (y la de Drive para copiar plantillas y exportar a PDF) con OAuth2 y un refresh token obtenido una única vez durante la configuración.
 
 ## Regla crítica de credenciales
 
@@ -91,6 +95,29 @@ Reemplaza **todas** las ocurrencias (texto literal, no regex). Ideal para
 llenar plantillas con marcadores tipo `{{CAMPO}}`. Usa `match_case=False`
 para ignorar mayúsculas/minúsculas.
 
+## Capacidad 5 — Crear un documento desde una plantilla
+
+```python
+nuevo = client.create_from_template(
+    "1Tpl...plantilla",               # ID del documento plantilla
+    "Contrato — Empresa 1",
+    replacements={"{{CLIENTE}}": "Empresa 1", "{{FECHA}}": "15/10/2026"},
+    parent_folder_id="1xYzCarpeta",   # opcional
+)
+print(nuevo["url"])
+print(nuevo["replacements"])  # {'{{CLIENTE}}': 2, '{{FECHA}}': 1}; 0 = marcador no encontrado
+```
+
+Copia la plantilla y aplica los reemplazos **solo en la copia**: la plantilla original nunca se modifica.
+
+## Capacidad 6 — Exportar a PDF
+
+```python
+ruta = client.export_pdf("1AbC...xyz", "/tmp/contrato.pdf")
+```
+
+Google limita la exportación a 10 MB por documento.
+
 ## Manejo de errores
 
 ```python
@@ -111,6 +138,6 @@ except DocsDataError as e:
 1. Lee credenciales SOLO de las variables `RUVIC_DOCS_*` (el constructor de `DocsClient` ya lo hace).
 2. Nunca imprimas `RUVIC_DOCS_CLIENT_SECRET` ni `RUVIC_DOCS_REFRESH_TOKEN` en logs ni en la salida.
 3. El conector solo puede acceder a documentos que estén **compartidos con la cuenta autorizada** (o de su propiedad). Si falla con "no existe o no es accesible", el usuario debe compartir el documento con esa cuenta (como Editor para poder escribir).
-4. Para llenar plantillas, usa `replace_text` con marcadores únicos (`{{CLIENTE}}`, `{{FECHA}}`) — una llamada por marcador.
+4. Para llenar una plantilla usa `create_from_template`, nunca `replace_text` directamente sobre la plantilla: eso la modificaría para siempre. Si `replacements` devuelve 0 para un marcador, avisa al usuario que no se encontró.
 5. `read_document` devuelve texto plano sin formato — suficiente para leer, resumir o verificar contenido, pero no preserva estilos, imágenes ni comentarios.
-6. El conector no elimina documentos, no cambia permisos ni accede a otros archivos de Drive.
+6. El conector no elimina documentos ni cambia permisos. Usa el scope `drive` solo para copiar plantillas y exportar a PDF; no lo uses para otras operaciones de Drive.

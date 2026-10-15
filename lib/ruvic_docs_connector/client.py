@@ -6,6 +6,12 @@ Capacidades:
 - create_document():  crear un documento nuevo (con texto inicial opcional).
 - append_text():      agregar texto al final de un documento.
 - replace_text():     buscar y reemplazar texto en todo el documento.
+- create_from_template(): copiar una plantilla y reemplazar sus variables
+                      en la copia (la plantilla no se modifica).
+- export_pdf():       exportar un documento a PDF en disco local.
+
+create_from_template() y export_pdf() usan la API de Drive, por eso el
+conector pide los scopes documents y drive.
 
 Las credenciales SIEMPRE provienen de variables de entorno RUVIC_DOCS_*
 (ver config.DocsConfig.from_env). Prohibido hardcodearlas.
@@ -14,6 +20,7 @@ Las credenciales SIEMPRE provienen de variables de entorno RUVIC_DOCS_*
 from __future__ import annotations
 
 import socket
+from pathlib import Path
 from typing import Any
 
 from google.auth.exceptions import GoogleAuthError, RefreshError
@@ -21,6 +28,7 @@ from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+from googleapiclient.http import MediaIoBaseDownload
 
 from .config import DocsConfig
 from .exceptions import (
@@ -32,7 +40,11 @@ from .exceptions import (
 from .logging_utils import get_logger
 
 _TOKEN_URI = "https://oauth2.googleapis.com/token"
-_SCOPES = ["https://www.googleapis.com/auth/documents"]
+_SCOPES = [
+    "https://www.googleapis.com/auth/documents",
+    "https://www.googleapis.com/auth/drive",
+]
+_DOC_MIME = "application/vnd.google-apps.document"
 
 
 def _service_disabled_info(exc: HttpError) -> tuple[str, str] | None:
@@ -73,7 +85,7 @@ def _wrap_http_error(exc: HttpError) -> DocsConnectorError:
         return DocsAuthError(
             "Credenciales inválidas o sin permiso suficiente sobre este "
             "documento. Verifica que el refresh token no esté revocado o "
-            "vencido, que se haya autorizado con el scope de Docs, y que la "
+            "vencido, que se haya autorizado con los scopes de Docs y Drive, y que la "
             "cuenta autenticada tenga acceso al documento (compartido con "
             "ella si es de otro usuario)."
         )
@@ -135,6 +147,7 @@ class DocsClient:
         self.config = config or DocsConfig.from_env()
         self._logger = get_logger()
         self._service: Any = None
+        self._drive_service: Any = None
         self._credentials: Credentials | None = None
 
     # ------------------------------------------------------------------ #
@@ -170,6 +183,24 @@ class DocsClient:
                 f"No se pudo inicializar el cliente de Docs: {exc}"
             ) from exc
         return self._service
+
+    def _get_drive_service(self) -> Any:
+        """Cliente de Drive v3, necesario para copiar plantillas y exportar a PDF."""
+        if self._drive_service is not None:
+            return self._drive_service
+        try:
+            self._drive_service = build(
+                "drive",
+                "v3",
+                credentials=self._get_credentials(),
+                cache_discovery=False,
+                static_discovery=False,
+            )
+        except (GoogleAuthError, OSError) as exc:
+            raise DocsNetworkError(
+                f"No se pudo inicializar el cliente de Drive: {exc}"
+            ) from exc
+        return self._drive_service
 
     def ping(self) -> bool:
         """Verifica que las credenciales OAuth sean válidas refrescando el
@@ -396,3 +427,158 @@ class DocsClient:
             "Reemplazadas %d ocurrencias de %r en %s", occurrences, find, document_id
         )
         return {"id": document_id, "occurrences_changed": occurrences}
+
+    # ------------------------------------------------------------------ #
+    # Capacidad 5 — Crear un documento a partir de una plantilla
+    # ------------------------------------------------------------------ #
+
+    def create_from_template(
+        self,
+        template_id: str,
+        title: str,
+        replacements: dict[str, str] | None = None,
+        parent_folder_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Copia una plantilla y reemplaza sus variables en la copia.
+
+        La plantilla original nunca se modifica: los reemplazos se aplican
+        solo sobre el documento nuevo.
+
+        Args:
+            template_id: ID del documento plantilla.
+            title: título del documento nuevo.
+            replacements: marcador -> valor (ej. {"{{CLIENTE}}": "ACME S.A."}).
+                Distingue mayúsculas/minúsculas.
+            parent_folder_id: carpeta de Drive destino (default: la raíz).
+
+        Returns:
+            Dict con: id, title, url, template_id, replacements (marcador ->
+            ocurrencias reemplazadas; 0 indica un marcador no encontrado).
+
+        Ejemplo:
+            >>> client.create_from_template("1Tpl...", "Contrato ACME", {"{{CLIENTE}}": "ACME S.A."})
+            {'id': '1New...', 'title': 'Contrato ACME', 'url': '...', 'template_id': '1Tpl...', 'replacements': {'{{CLIENTE}}': 2}}
+        """
+        template_id = _validate_document_id(template_id)
+        title = title.strip()
+        if not title:
+            raise DocsDataError("title no puede estar vacío.")
+        replacements = replacements or {}
+        if not isinstance(replacements, dict) or not all(
+            isinstance(k, str) and k for k in replacements
+        ):
+            raise DocsDataError(
+                "replacements debe ser un dict de marcador (string no vacío) -> valor."
+            )
+
+        drive = self._get_drive_service()
+        try:
+            meta = (
+                drive.files()
+                .get(fileId=template_id, fields="mimeType", supportsAllDrives=True)
+                .execute(num_retries=1)
+            )
+            if meta.get("mimeType") != _DOC_MIME:
+                raise DocsDataError(
+                    f"La plantilla {template_id} no es un documento de Google Docs "
+                    f"(tipo {meta.get('mimeType')})."
+                )
+            body: dict[str, Any] = {"name": title}
+            if parent_folder_id:
+                body["parents"] = [parent_folder_id]
+            copy = (
+                drive.files()
+                .copy(fileId=template_id, body=body, fields="id, name", supportsAllDrives=True)
+                .execute(num_retries=1)
+            )
+        except (RefreshError, GoogleAuthError) as exc:
+            raise DocsAuthError(
+                f"No se pudo autenticar: el token OAuth/credenciales pueden "
+                f"estar revocados, vencidos o ser inválidos. Vuelve a "
+                f"autorizar el conector. Detalle: {exc}"
+            ) from exc
+        except HttpError as exc:
+            raise _wrap_http_error(exc) from exc
+
+        document_id = copy["id"]
+        changed: dict[str, int] = {}
+        if replacements:
+            markers = list(replacements)
+            try:
+                result = self._get_service().documents().batchUpdate(
+                    documentId=document_id,
+                    body={
+                        "requests": [
+                            {
+                                "replaceAllText": {
+                                    "containsText": {"text": marker, "matchCase": True},
+                                    "replaceText": str(replacements[marker]),
+                                }
+                            }
+                            for marker in markers
+                        ]
+                    },
+                ).execute(num_retries=1)
+            except HttpError as exc:
+                raise DocsDataError(
+                    f"Se creó la copia {document_id} pero falló el reemplazo de "
+                    f"variables: {_wrap_http_error(exc)}"
+                ) from exc
+            for marker, reply in zip(markers, result.get("replies", [])):
+                changed[marker] = reply.get("replaceAllText", {}).get("occurrencesChanged", 0)
+
+        self._logger.info(
+            "Documento '%s' creado desde la plantilla %s (id=%s)", title, template_id, document_id
+        )
+        return {
+            "id": document_id,
+            "title": copy.get("name", title),
+            "url": f"https://docs.google.com/document/d/{document_id}/edit",
+            "template_id": template_id,
+            "replacements": changed,
+        }
+
+    # ------------------------------------------------------------------ #
+    # Capacidad 6 — Exportar a PDF
+    # ------------------------------------------------------------------ #
+
+    def export_pdf(self, document_id: str, destination_path: str) -> str:
+        """Exporta un documento a PDF y lo guarda en disco local.
+
+        Google limita la exportación a 10 MB por archivo.
+
+        Args:
+            document_id: ID del documento.
+            destination_path: ruta local del PDF. Si ya existe, se sobrescribe.
+
+        Returns:
+            La ruta local donde quedó guardado el PDF.
+
+        Ejemplo:
+            >>> client.export_pdf("1AbC...xyz", "/tmp/contrato.pdf")
+            '/tmp/contrato.pdf'
+        """
+        document_id = _validate_document_id(document_id)
+        if not destination_path:
+            raise DocsDataError("destination_path no puede estar vacío.")
+        drive = self._get_drive_service()
+        dest = Path(destination_path)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            request = drive.files().export_media(fileId=document_id, mimeType="application/pdf")
+            with dest.open("wb") as fh:
+                downloader = MediaIoBaseDownload(fh, request)
+                done = False
+                while not done:
+                    _, done = downloader.next_chunk(num_retries=1)
+        except (RefreshError, GoogleAuthError) as exc:
+            raise DocsAuthError(
+                f"No se pudo autenticar: el token OAuth/credenciales pueden "
+                f"estar revocados, vencidos o ser inválidos. Vuelve a "
+                f"autorizar el conector. Detalle: {exc}"
+            ) from exc
+        except HttpError as exc:
+            dest.unlink(missing_ok=True)
+            raise _wrap_http_error(exc) from exc
+        self._logger.info("Documento %s exportado a PDF en %s", document_id, dest)
+        return str(dest)

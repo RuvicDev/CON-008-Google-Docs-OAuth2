@@ -84,10 +84,17 @@ sean claros.
 - **OAuth2 de usuario**: mismo flujo que los conectores Gmail/Sheets/
   Drive-OAuth — 3 modos de autorización en el manifest que resuelven a
   las mismas 3 env vars.
-- **Alcance mínimo**: solo `https://www.googleapis.com/auth/documents`
-  (lectura y edición de documentos accesibles por la cuenta). No accede
-  a otros archivos de Drive ni puede listar documentos por sí solo — el
-  `document_id` lo debe aportar el usuario (de la URL del documento).
+- **Scopes**: `https://www.googleapis.com/auth/documents` (lectura y
+  edición de documentos) y `https://www.googleapis.com/auth/drive`
+  (copiar plantillas con `create_from_template` y exportar a PDF con
+  `export_pdf`). No lista documentos por sí solo — el `document_id` lo
+  debe aportar el usuario (de la URL del documento).
+- **Plantillas seguras**: `create_from_template` copia la plantilla y
+  reemplaza los marcadores solo en la copia; la plantilla nunca se
+  modifica.
+- **Cambio de scopes**: un refresh token obtenido antes de esta versión
+  solo tiene el scope `documents`. Hay que volver a autorizar el
+  conector para usar `create_from_template` y `export_pdf`.
 - **Detección de API deshabilitada**: si la Docs API no está habilitada
   en el proyecto de Cloud, el error indica la API exacta y el enlace
   directo de activación (caso `SERVICE_DISABLED`).
@@ -109,9 +116,8 @@ sean claros.
 - `replace_text` busca texto **literal** (no expresiones regulares) y
   reemplaza todas las ocurrencias — no hay reemplazo selectivo por
   posición.
-- No elimina documentos, no cambia permisos, no mueve archivos entre
-  carpetas ni exporta a otros formatos (para descargar como PDF usa el
-  conector `drive_oauth`).
+- No elimina documentos, no cambia permisos ni mueve archivos entre
+  carpetas. Solo exporta a PDF (límite de Google: 10 MB por documento).
 - En modo "Usar credenciales propias" o "Refresh token manual" con una
   app OAuth en estado *Testing*, el refresh token puede expirar a los
   7 días sin uso.

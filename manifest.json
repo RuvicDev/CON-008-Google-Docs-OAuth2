@@ -28,7 +28,7 @@
           "oauth2": {
             "authorization_url": "https://accounts.google.com/o/oauth2/v2/auth",
             "token_url": "https://oauth2.googleapis.com/token",
-            "scopes": ["https://www.googleapis.com/auth/documents", "openid", "email"],
+            "scopes": ["https://www.googleapis.com/auth/documents", "https://www.googleapis.com/auth/drive", "openid", "email"],
             "extra_authorize_params": {
               "access_type": "offline",
               "prompt": "consent"
@@ -79,7 +79,7 @@
           "oauth2": {
             "authorization_url": "https://accounts.google.com/o/oauth2/v2/auth",
             "token_url": "https://oauth2.googleapis.com/token",
-            "scopes": ["https://www.googleapis.com/auth/documents", "openid", "email"],
+            "scopes": ["https://www.googleapis.com/auth/documents", "https://www.googleapis.com/auth/drive", "openid", "email"],
             "extra_authorize_params": {
               "access_type": "offline",
               "prompt": "consent"
@@ -139,10 +139,10 @@
     }
   ],
   "env_prefix": "RUVIC_DOCS_",
-  "operations": ["docs.read", "docs.create", "docs.append", "docs.replace"],
+  "operations": ["docs.read", "docs.create", "docs.append", "docs.replace", "docs.create_from_template", "docs.export_pdf"],
   "test_connection": true,
   "docs": {
     "skill": "SKILL.md",
-    "permissions_note": "OAuth2 con scope documents (lectura y edición de los documentos accesibles por la cuenta que autoriza; no accede a otros archivos de Drive). Modo recomendado: Autorizar con Google (app OAuth de Ruvic). Alternativas: credenciales propias o refresh token manual. Funciona con cuentas de Google personales y con Google Workspace."
+    "permissions_note": "OAuth2 con scopes documents y drive. documents permite leer y editar los documentos accesibles por la cuenta que autoriza; drive es necesario para copiar plantillas (create_from_template) y exportar a PDF (export_pdf), y da acceso de lectura y escritura al Drive de esa cuenta. Modo recomendado: Autorizar con Google (app OAuth de Ruvic). Alternativas: credenciales propias o refresh token manual. Funciona con cuentas de Google personales y con Google Workspace."
   }
 }

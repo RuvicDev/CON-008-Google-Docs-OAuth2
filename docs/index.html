@@ -62,6 +62,14 @@
             <td><code>docs.replace</code></td>
             <td>Busca y reemplaza texto en todo el documento (ideal para plantillas)</td>
           </tr>
+          <tr>
+            <td><code>docs.create_from_template</code></td>
+            <td>Crea un documento copiando una plantilla y reemplazando sus variables en la copia (la plantilla no se modifica)</td>
+          </tr>
+          <tr>
+            <td><code>docs.export_pdf</code></td>
+            <td>Exporta un documento a PDF (máx. 10 MB)</td>
+          </tr>
         </tbody>
       </table>
 
@@ -136,7 +144,7 @@ python get_refresh_token.py --client-id TU_CLIENT_ID --client-secret TU_CLIENT_S
     <section>
       <h2 id="permisos">Permisos requeridos</h2>
 
-      <p>Principio de mínimo privilegio: el conector solo necesita este scope de Docs. No agregues scopes de Drive completo ni de otras APIs de Workspace.</p>
+      <p>El conector necesita dos scopes: <code>documents</code> para editar documentos y <code>drive</code> para copiar plantillas y exportar a PDF. No agregues scopes de otras APIs de Workspace.</p>
 
       <table>
         <thead>
@@ -150,10 +158,14 @@ python get_refresh_token.py --client-id TU_CLIENT_ID --client-secret TU_CLIENT_S
             <td><code>documents</code></td>
             <td>Leer (<code>docs.read</code>), crear (<code>docs.create</code>) y editar (<code>docs.append</code>, <code>docs.replace</code>) documentos accesibles por la cuenta</td>
           </tr>
+          <tr>
+            <td><code>drive</code></td>
+            <td>Copiar plantillas (<code>docs.create_from_template</code>) y exportar a PDF (<code>docs.export_pdf</code>)</td>
+          </tr>
         </tbody>
       </table>
 
-      <p>El conector <strong>no</strong> solicita el scope completo de Drive: no puede mover, eliminar ni cambiar permisos de archivos, ni acceder a archivos que no sean documentos de Google Docs.</p>
+      <p>El scope <code>drive</code> da acceso de lectura y escritura a todo el Drive de la cuenta autorizada. El conector solo lo usa para copiar plantillas y exportar a PDF: no mueve, elimina ni cambia permisos de archivos.</p>
     </section>
 
     <!-- ============ 5. CONFIGURACIÓN EN RUVIC ============ -->
@@ -254,7 +266,7 @@ python get_refresh_token.py --client-id TU_CLIENT_ID --client-secret TU_CLIENT_S
       <p>Sí, cualquier documento del que la cuenta autorizada sea dueña o que tenga compartido — el scope <code>documents</code> no distingue entre documentos específicos. Para limitar el alcance, usa una cuenta de Google dedicada que solo tenga acceso a los documentos que el agente debe usar.</p>
 
       <h3>¿El agente puede eliminar documentos o cambiar permisos?</h3>
-      <p>No. El conector solo lee, crea y edita el contenido de documentos (<code>docs.read</code>, <code>docs.create</code>, <code>docs.append</code>, <code>docs.replace</code>). No elimina archivos, no cambia permisos de acceso ni toca otros archivos de Drive.</p>
+      <p>No. El conector solo lee, crea y edita el contenido de documentos (<code>docs.read</code>, <code>docs.create</code>, <code>docs.append</code>, <code>docs.replace</code>), copia plantillas y exporta a PDF. No elimina archivos ni cambia permisos de acceso.</p>
 
       <h3>¿Dónde queda guardado el refresh token?</h3>
       <p>Como secreto en el almacén de credenciales de la plataforma, asociado a tu usuario, igual que el client_secret. La interfaz nunca vuelve a mostrarlos; solo indica "definido".</p>
